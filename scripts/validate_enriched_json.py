@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import Any
 
 
-STATUSES = {"complete", "partial", "not_found", "ambiguous", "error"}
-EMAIL_STATUSES = {"verified", "catch_all", "unverified", "unavailable"}
+STATUSES = {"complete"}
+EMAIL_STATUSES = {"verified"}
 PHONE_TYPES = {"direct_dial", "business_mobile", "company_main", "unavailable"}
-EMPLOYMENT_STATUSES = {"current_verified", "current_reported", "unknown"}
+EMPLOYMENT_STATUSES = {"current_verified"}
 PERSONAL_EMAIL_DOMAINS = {
     "gmail.com", "googlemail.com", "yahoo.com", "outlook.com", "hotmail.com",
     "live.com", "icloud.com", "aol.com", "gmx.de", "web.de",
@@ -58,7 +58,7 @@ def validate_record(record: Any, index: int, errors: list[str]) -> None:
     if person is not None and not isinstance(person, dict):
         fail(errors, base + ".contact_enrichment.person", "must be an object or null")
     elif isinstance(person, dict):
-        for key in ("full_name", "job_title", "current_employer"):
+        for key in ("full_name", "first_name", "last_name", "job_title", "current_employer"):
             if not isinstance(person.get(key), str) or not person[key].strip():
                 fail(errors, f"{base}.contact_enrichment.person.{key}", "must be a non-empty string")
         for key in ("first_name", "last_name", "department", "seniority", "location", "professional_profile_url", "provider_person_id"):
@@ -79,8 +79,10 @@ def validate_record(record: Any, index: int, errors: list[str]) -> None:
                 domain = email_value.rsplit("@", 1)[1].lower()
                 if domain in PERSONAL_EMAIL_DOMAINS:
                     fail(errors, base + ".contact_enrichment.person.work_email.value", "must not use a personal webmail domain")
-            if email_value is None and email_status != "unavailable":
-                fail(errors, base + ".contact_enrichment.person.work_email.status", "must be unavailable when value is null")
+            if not isinstance(email_value, str) or not email_value.strip() or "@" not in email_value:
+                fail(errors, base + ".contact_enrichment.person.work_email.value", "must be a populated business email")
+            if email_status != "verified":
+                fail(errors, base + ".contact_enrichment.person.work_email.status", "must be verified")
 
         phone = person.get("business_phone")
         if not isinstance(phone, dict):
@@ -130,16 +132,10 @@ def validate_record(record: Any, index: int, errors: list[str]) -> None:
         if key not in enrichment or not nullable_string(enrichment[key]):
             fail(errors, f"{base}.contact_enrichment.{key}", "must be string or null")
 
-    if status in {"complete", "partial"} and person is None:
-        fail(errors, base + ".contact_enrichment.person", f"must not be null for {status}")
-    if status in {"complete", "partial"} and employment_status == "unknown":
-        fail(errors, base + ".contact_enrichment.employment_evidence.status", f"must support current employment for {status}")
-    if status == "complete" and isinstance(person, dict):
-        email_value = (person.get("work_email") or {}).get("value")
-        phone_value = (person.get("business_phone") or {}).get("value")
-        profile = person.get("professional_profile_url")
-        if not any(isinstance(value, str) and value.strip() for value in (email_value, phone_value, profile)):
-            fail(errors, base + ".contact_enrichment.person", "complete requires at least one professional reachability field")
+    if person is None:
+        fail(errors, base + ".contact_enrichment.person", "must not be null")
+    if employment_status != "current_verified":
+        fail(errors, base + ".contact_enrichment.employment_evidence.status", "must be current_verified")
 
 
 def main() -> int:

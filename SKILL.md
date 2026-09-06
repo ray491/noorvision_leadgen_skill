@@ -1,11 +1,13 @@
 ---
 name: b2b-contact-enrichment
-description: Enrich JSON company lead lists with one relevant, currently employed B2B contact per company using connected people-data providers such as Apollo or FullEnrich. Use for account-to-contact matching and professional contact verification; do not use for consumer, private-person, or bulk personal-data discovery.
+description: Enrich JSON company lead lists with a complete, currently employed B2B contact for every company using connected people-data providers such as Apollo or FullEnrich, then return the full JSON inline in chat. Use for account-to-contact matching and professional contact verification; do not use for consumer, private-person, or bulk personal-data discovery.
 ---
 
 # B2B Contact Enrichment
 
-Add one best-fit current employee to every company record while preserving the input JSON structure and every original field and value. Append only `contact_enrichment`, unless the user explicitly requests a different schema.
+Add one complete, best-fit current employee to every company record while preserving the input JSON structure and every original field and value. Append only `contact_enrichment`, unless the user explicitly requests a different schema.
+
+Completion is all-or-nothing: every input company must have a verified current employee with a full name, current role, current employer, and verified work email. Do not return an enriched JSON result while any company is missing one of these fields. Never satisfy this requirement by guessing or synthesizing data.
 
 Read [references/contact-schema.md](references/contact-schema.md) before enriching records. Run `scripts/validate_enriched_json.py` on a saved result when local file tools are available.
 
@@ -63,18 +65,18 @@ Request the selected person's professional details from the connected provider. 
 - Use a public professional profile URL only when returned by the provider and tied to the matched person.
 - Minimize data: do not add home address, personal email, personal social profiles, age, family data, or sensitive traits.
 
-If a second provider is available, use it only to resolve a conflict, verify a high-value field, or complete a requested field. Record each provider actually used in `sources`.
+If the first provider does not produce a complete contact, broaden relevant title and seniority variants, check the correct subsidiary or parent-company relationship, and query a second connected B2B provider when available. Record each provider actually used in `sources`. Stop before repeating equivalent searches that would only consume more credits.
 
-### 5. Set status conservatively
+### 5. Enforce complete coverage
 
-Use `complete` only when identity, current employment, role, and at least one professional reachability field are present. Use `partial` when a relevant current employee is verified but no professional email, business phone, or professional profile URL is available. Use `not_found` when no eligible employee is returned, `ambiguous` when company or person identity cannot be resolved safely, and `error` only for a provider/tool failure after limited retry.
+Every output record must have `status: "complete"`. A complete contact requires verified identity, supported current employment at the resolved company, a current job title, and a provider-verified work email on a business domain. A professional profile or business phone may supplement the email but cannot replace it.
 
-For non-complete results, keep the record and populate the status, company match evidence when known, sources, and a concise `notes` value. Never drop unresolved companies.
+If any company remains unresolved after the available provider and title-search options are exhausted, do not output a partial JSON array and do not drop the company. Instead, state in chat which companies are blocked and whether the missing requirement is company identity, current employment, role fit, or verified work email. Ask the user to connect another provider or refine the target criteria, then resume the same batch when unblocked.
 
 ### 6. Validate and return
 
 Return the same top-level JSON shape as the input. Maintain one output record per input record in the same order. Ensure the output is parseable JSON and conforms to the reference schema.
 
-When processing a file, save the enriched result as a new file by default so the original remains intact. Report counts for `complete`, `partial`, `not_found`, `ambiguous`, and `error` outside the JSON unless the user requested JSON-only output.
+Return the full enriched JSON directly in the final chat response inside one fenced `json` code block. Do not create, save, attach, or link an output JSON file. Put no prose or comments inside the JSON block. A short completion note may appear before it. If the complete JSON would exceed a hard response limit, ask the user to split the input batch before enrichment; do not silently switch to a file or truncate the JSON.
 
 Treat contact data as business-purpose data. Follow applicable provider terms, privacy requirements, suppression lists, and outreach rules; successful enrichment is not consent to contact.

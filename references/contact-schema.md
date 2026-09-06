@@ -1,11 +1,11 @@
 # Contact enrichment schema
 
-Append this object to every company record under `contact_enrichment`. Use JSON `null` for unavailable scalar fields and `[]` for no sources. Do not omit keys from `company_match`; `person` may be `null` when no person is safely identified.
+Append this object to every company record under `contact_enrichment`. Every record in a returned result must be complete. Use JSON `null` only for optional scalar fields and do not omit keys from `company_match` or `person`.
 
 ```json
 {
   "contact_enrichment": {
-    "status": "complete | partial | not_found | ambiguous | error",
+    "status": "complete",
     "company_match": {
       "canonical_name": "string or null",
       "domain": "string or null",
@@ -24,7 +24,7 @@ Append this object to every company record under `contact_enrichment`. Use JSON 
       "professional_profile_url": "string or null",
       "work_email": {
         "value": "string or null",
-        "status": "verified | catch_all | unverified | unavailable"
+        "status": "verified"
       },
       "business_phone": {
         "value": "string or null",
@@ -54,12 +54,15 @@ Append this object to every company record under `contact_enrichment`. Use JSON 
 
 - `confidence` fields are numbers from `0` through `1`; they express matching confidence, not provider guarantees.
 - `provider_company_id` and `provider_person_id` must be values returned by a provider, never synthesized.
-- `complete` requires a non-null `person`, `employment_evidence.status` other than `unknown`, and at least one of: professional profile URL, non-null work email, or non-null business phone.
-- `partial` requires a non-null `person` whose current employment is supported, but allows all reachability values to be unavailable.
-- `not_found`, `ambiguous`, and `error` normally use `person: null`.
+- Every returned record must use `status: "complete"` and contain a non-null `person`.
+- `full_name`, `first_name`, `last_name`, `job_title`, and `current_employer` must be populated.
+- `employment_evidence.status` must be `current_verified`.
+- `work_email.value` must be populated with a provider-returned business email and `work_email.status` must be `verified`.
+- A professional profile or business phone may supplement the verified work email but cannot replace it.
 - A work email on a personal webmail domain is invalid even when a provider returns it.
 - `selection_reason` should explain role fit in one sentence, not restate private data.
 - `sources` identifies only providers queried for that record. It should not include invented citations or a provider that was merely available.
+- If any company cannot meet all required fields, return no enrichment JSON; report the blocker in chat instead.
 
 ## Example appended object
 
