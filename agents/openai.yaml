@@ -1,0 +1,4 @@
+interface:
+  display_name: "B2B Contact Enrichment"
+  short_description: "Verify current contacts for company lead lists"
+  default_prompt: "Use $b2b-contact-enrichment to enrich this company JSON with verified current employee contact data."
